@@ -50,22 +50,37 @@ class Mortgage:
     def annual_payment(self):
         return self.monthly_payment() * MONTHS_IN_YEAR
 
-    def total_payout(self):
-        return self.monthly_payment() * self.loan_months()
+    def total_payout(self, extra_principle_payments=[]):
+        if extra_principle_payments == []:
+            # should use sum([sum(m) for m in monthly_payments]) but i m too lazy
+            return self.monthly_payment() * self.loan_months()
+        else:
+            monthly_payments = list(self.monthly_payment_schedule(extra_principle_payments=extra_principle_payments))
+            return sum([sum(m) for m in monthly_payments])
 
-    def monthly_payment_schedule(self):
+    def monthly_payment_schedule(self, extra_principle_payments=[]):
         monthly = self.monthly_payment()
         balance = dollar(self.amount())
         rate = decimal.Decimal(str(self.rate())).quantize(decimal.Decimal('.000001'))
+        epps = [dollar(e)  for e in extra_principle_payments]
         while True:
+            try:
+                extra_principle = epps.pop(0)
+            except IndexError as e:
+                extra_principle = dollar(0)
+
             interest_unrounded = balance * rate * decimal.Decimal(1)/MONTHS_IN_YEAR
             interest = dollar(interest_unrounded, round=decimal.ROUND_HALF_UP)
+
             if monthly >= balance + interest:
-                yield balance, interest
+                # should add warning
+                # reset the extra_principle = 0 since there is no point to pay
+                yield balance, interest, extra_principle
                 break
+
             principle = monthly - interest
-            yield principle, interest
-            balance -= principle
+            yield principle, interest, extra_principle
+            balance = balance - principle - extra_principle
 
 def print_summary(m):
     print('{0:>25s}:  {1:>12.6f}'.format('Rate', m.rate()))
